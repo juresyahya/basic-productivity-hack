@@ -2,6 +2,7 @@ import imaplib
 import email
 import os
 from datetime import datetime
+from email.header import decode_header, make_header
 
 EMAIL = "jures@basicinception.com"
 PASSWORD = "sloo nkmu glzw mbtv"
@@ -13,12 +14,26 @@ BILLS = [
         "name": "TIME",
         "subject": "Your Latest Time Bill",
         "sender": None,
+        "reply_to": None,
     },
     {
         "name": "MACROMAC",
         "subject": "Monthly Invoice",
         "sender": "noreply@copier2u.com",
+        "reply_to": None,
     },
+    {
+        "name": "COWAY",
+        "subject": "COWAY",
+        "sender": None,
+        "reply_to": "nani.coway@yahoo.com",
+    },
+    {
+        "name": "DigitalOcean",
+        "subject": "DigitalOcean",
+        "sender": None,
+        "reply_to": None,
+    },    
 ]
 
 mail = imaplib.IMAP4_SSL("imap.gmail.com")
@@ -36,6 +51,11 @@ for bill in BILLS:
         status, data = mail.fetch(num, "(RFC822)")
         msg = email.message_from_bytes(data[0][1])
 
+        if bill["reply_to"]:
+            reply_to = msg.get("Reply-To", "")
+            if bill["reply_to"].lower() not in reply_to.lower():
+                continue
+
         date = msg["date"]
 
         try:
@@ -48,12 +68,14 @@ for bill in BILLS:
         save_dir = os.path.join(BASE_DIR.format(year=year), bill["name"])
 
         for part in msg.walk():
-            if part.get_content_disposition() != "attachment":
+            raw_filename = part.get_filename()
+
+            if not raw_filename:
                 continue
 
-            filename = part.get_filename()
+            filename = str(make_header(decode_header(raw_filename)))
 
-            if not filename or not filename.lower().endswith(".pdf"):
+            if not filename.lower().endswith(".pdf"):
                 continue
 
             os.makedirs(save_dir, exist_ok=True)
