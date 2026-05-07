@@ -6,48 +6,59 @@ from datetime import datetime
 EMAIL = "jures@basicinception.com"
 PASSWORD = "sloo nkmu glzw mbtv"
 
-year = datetime.now().strftime("%Y")
+BASE_DIR = "/mnt/g/My Drive/Basic Inception/02 - Finance/01 - Financial Documents/07 - Transactions/{year}/02 - Accounts Payable/01 - Bills Received"
 
-# Google Drive folder (Windows mounted in WSL)
-SAVE_DIR = f"/mnt/g/My Drive/Basic Inception/02 - Finance/01 - Financial Documents/07 - Transactions/{year}/02 - Accounts Payable/01 - Bills Received/TIME"
+BILLS = [
+    {
+        "name": "TIME",
+        "subject": "Your Latest Time Bill",
+        "sender": None,
+    },
+    {
+        "name": "MACROMAC",
+        "subject": "Monthly Invoice",
+        "sender": "noreply@copier2u.com",
+    },
+]
 
 mail = imaplib.IMAP4_SSL("imap.gmail.com")
 mail.login(EMAIL, PASSWORD)
 mail.select("inbox")
 
-# Search unread emails with attachments
-status, messages = mail.search(None, '(UNSEEN SUBJECT "Your Latest Time Bill")')
+for bill in BILLS:
+    criteria = f'(UNSEEN SUBJECT "{bill["subject"]}")'
+    if bill["sender"]:
+        criteria = f'(UNSEEN SUBJECT "{bill["subject"]}" FROM "{bill["sender"]}")'
 
-for num in messages[0].split():
-    status, data = mail.fetch(num, "(RFC822)")
-    msg = email.message_from_bytes(data[0][1])
+    status, messages = mail.search(None, criteria)
 
-    subject = msg["subject"] or ""
-    date = msg["date"]
+    for num in messages[0].split():
+        status, data = mail.fetch(num, "(RFC822)")
+        msg = email.message_from_bytes(data[0][1])
 
-    try:
-        parsed_date = datetime.strptime(date[:25], "%a, %d %b %Y %H:%M:%S")
-    except:
-        parsed_date = datetime.now()
+        date = msg["date"]
 
-    year = parsed_date.strftime("%Y")
-    month = parsed_date.strftime("%m")
+        try:
+            parsed_date = datetime.strptime(date[:25], "%a, %d %b %Y %H:%M:%S")
+        except Exception:
+            parsed_date = datetime.now()
 
-    for part in msg.walk():
-        if part.get_content_disposition() == "attachment":
+        year = parsed_date.strftime("%Y")
+
+        save_dir = os.path.join(BASE_DIR.format(year=year), bill["name"])
+
+        for part in msg.walk():
+            if part.get_content_disposition() != "attachment":
+                continue
+
             filename = part.get_filename()
 
-            if not filename:
+            if not filename or not filename.lower().endswith(".pdf"):
                 continue
 
-            if not filename.lower().endswith(".pdf"):
-                continue
+            os.makedirs(save_dir, exist_ok=True)
 
-            # Create folder
-            folder = f"{SAVE_DIR}"
-            os.makedirs(folder, exist_ok=True)
-
-            filepath = os.path.join(folder, filename)
+            filepath = os.path.join(save_dir, filename)
 
             with open(filepath, "wb") as f:
                 f.write(part.get_payload(decode=True))
